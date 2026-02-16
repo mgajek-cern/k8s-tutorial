@@ -1,0 +1,114 @@
+---
+# S3-1 MinIO Storage
+apiVersion: v1
+kind: Pod
+metadata:
+  name: s3-1
+  namespace: rucio-tutorial
+  labels:
+    app: s3-1
+spec:
+  containers:
+    - name: s3-1
+      image: minio/minio:latest
+      args:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+      env:
+        - name: MINIO_ROOT_USER
+          value: "rucio"
+        - name: MINIO_ROOT_PASSWORD
+          value: "rucio123"
+      ports:
+        - name: api
+          containerPort: 9000
+          protocol: TCP
+        - name: console
+          containerPort: 9001
+          protocol: TCP
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3-1
+  namespace: rucio-tutorial
+  labels:
+    app: s3-1
+spec:
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: api
+    - port: 9001
+      targetPort: 9001
+      protocol: TCP
+      name: console
+  selector:
+    app: s3-1
+---
+# S3-2 MinIO Storage
+apiVersion: v1
+kind: Pod
+metadata:
+  name: s3-2
+  namespace: rucio-tutorial
+  labels:
+    app: s3-2
+spec:
+  containers:
+    - name: s3-2
+      image: minio/minio:latest
+      args:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+      env:
+        - name: MINIO_ROOT_USER
+          value: "rucio"
+        - name: MINIO_ROOT_PASSWORD
+          value: "rucio123"
+      ports:
+        - name: api
+          containerPort: 9000
+          protocol: TCP
+        - name: console
+          containerPort: 9001
+          protocol: TCP
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3-2
+  namespace: rucio-tutorial
+  labels:
+    app: s3-2
+spec:
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: api
+    - port: 9001
+      targetPort: 9001
+      protocol: TCP
+      name: console
+  selector:
+    app: s3-2

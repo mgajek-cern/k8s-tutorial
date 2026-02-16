@@ -3,6 +3,37 @@ set -e
 
 cd "$(dirname "$0")"
 
+# Parse feature flags
+ENABLE_S3=false
+ENABLE_DCACHE=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --enable-s3)
+      ENABLE_S3=true
+      shift
+      ;;
+    --enable-dcache)
+      ENABLE_DCACHE=true
+      shift
+      ;;
+    --enable-all-storage)
+      ENABLE_S3=true
+      ENABLE_DCACHE=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--enable-s3] [--enable-dcache] [--enable-all-storage]"
+      exit 1
+      ;;
+  esac
+done
+
+# Check environment variables
+[[ "${RUCIO_ENABLE_S3}" == "true" ]] && ENABLE_S3=true
+[[ "${RUCIO_ENABLE_DCACHE}" == "true" ]] && ENABLE_DCACHE=true
+
 echo "┌─────────────────────────┐"
 echo "⟾ Create tutorial namespace │"
 echo "└─────────────────────────┘"
@@ -40,12 +71,14 @@ if [[ "${WILL_STOP_PODS}" == "y" ]]; then
     helm uninstall postgres --namespace rucio-tutorial --debug 2>/dev/null || true
     kubectl delete job daemons-renew-fts-proxy-on-helm-install 2>/dev/null || true
     kubectl delete pvc data-postgres-postgresql-0 2>/dev/null || true
-    kubectl delete -f ../manifests/fts.yaml --all=true --recursive=true
-    kubectl delete -f ../manifests/ftsdb.yaml --all=true --recursive=true
-    kubectl delete -f ../manifests/xrd.yaml --all=true --recursive=true
-    kubectl delete -f ../manifests/client.yaml --all=true --recursive=true
-    kubectl delete -f ../manifests/init-pod.yaml --all=true --recursive=true
-    kubectl delete -k ../secrets
+    kubectl delete -f ../manifests/fts.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/ftsdb.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/xrd.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/s3.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/dcache.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/client.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -f ../manifests/init-pod.yaml --all=true --recursive=true 2>/dev/null || true
+    kubectl delete -k ../secrets 2>/dev/null || true
     kubectl get all
     if [[ "$(kubectl get all -o custom-columns=NAME:metadata.name --no-headers | wc -l)" -le 1 ]]; then
       break
@@ -60,6 +93,7 @@ echo ""
 echo "# --------------------------------------"
 echo "# Start Rucio deployment"
 echo "# --------------------------------------"
+echo "Storage enabled: XRootD=always S3=${ENABLE_S3} dCache=${ENABLE_DCACHE}"
 
 echo "┌──────────────────────────┐"
 echo "⟾ Add repositories to helm │"
@@ -130,6 +164,31 @@ for XRD_CONTAINER in "${XRD_CONTAINERS[@]}"; do
   kubectl --timeout=120s wait --for=condition=Ready pod/$XRD_CONTAINER
 done
 
+# Conditional storage deployments
+if [[ "${ENABLE_S3}" == "true" ]]; then
+  echo "┌────────────────────────────────────────┐"
+  echo "⟾ kubectl: Start S3 storage pods (MinIO) │"
+  echo "└────────────────────────────────────────┘"
+  kubectl apply -f ../manifests/s3.yaml
+  S3_CONTAINERS=(s3-1 s3-2)
+  echo "S3_CONTAINERS: ${S3_CONTAINERS[*]}"
+  for S3_CONTAINER in "${S3_CONTAINERS[@]}"; do
+    kubectl --timeout=120s wait --for=condition=Ready pod/$S3_CONTAINER
+  done
+fi
+
+if [[ "${ENABLE_DCACHE}" == "true" ]]; then
+  echo "┌────────────────────────────────────┐"
+  echo "⟾ kubectl: Start dCache storage pods │"
+  echo "└────────────────────────────────────┘"
+  kubectl apply -f ../manifests/dcache.yaml
+  DCACHE_CONTAINERS=(dcache-1 dcache-2)
+  echo "DCACHE_CONTAINERS: ${DCACHE_CONTAINERS[*]}"
+  for DCACHE_CONTAINER in "${DCACHE_CONTAINERS[@]}"; do
+    kubectl --timeout=120s wait --for=condition=Ready pod/$DCACHE_CONTAINER
+  done
+fi
+
 echo "┌───────────────────────────────────────┐"
 echo "⟾ kubectl: Install FTS database (MySQL) │"
 echo "└───────────────────────────────────────┘"
@@ -178,3 +237,4 @@ echo""
 echo""
 echo""
 echo "*** Rucio deployment complete. ***"
+echo "Storage deployed: XRootD, S3=${ENABLE_S3}, dCache=${ENABLE_DCACHE}"

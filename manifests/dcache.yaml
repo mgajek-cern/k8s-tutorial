@@ -1,0 +1,136 @@
+---
+# dCache-1 Storage
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dcache-1
+  namespace: rucio-tutorial
+  labels:
+    app: dcache-1
+spec:
+  containers:
+    - name: dcache-1
+      image: dcache/dcache:11.0
+      ports:
+        - name: webdav
+          containerPort: 2880
+          protocol: TCP
+        - name: gsiftp
+          containerPort: 2811
+          protocol: TCP
+      env:
+        - name: DCACHE_DOMAIN_SERVICE_PORTS
+          value: "2880,2811"
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "200m"
+        limits:
+          memory: "1024Mi"
+          cpu: "500m"
+      volumeMounts:
+        - name: hostcert
+          mountPath: /etc/grid-security/hostcert.pem
+          subPath: tls.cert
+        - name: hostcert
+          mountPath: /etc/grid-security/hostkey.pem
+          subPath: tls.key
+        - name: ca-cert
+          mountPath: /etc/grid-security/certificates/5fca1cb1.0
+          subPath: tls.cert
+  volumes:
+    - name: hostcert
+      secret:
+        secretName: hostcert-dcache1
+        defaultMode: 0600
+    - name: ca-cert
+      secret:
+        secretName: ca-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcache-1
+  namespace: rucio-tutorial
+  labels:
+    app: dcache-1
+spec:
+  ports:
+    - port: 2880
+      targetPort: 2880
+      protocol: TCP
+      name: webdav
+    - port: 2811
+      targetPort: 2811
+      protocol: TCP
+      name: gsiftp
+  selector:
+    app: dcache-1
+---
+# dCache-2 Storage
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dcache-2
+  namespace: rucio-tutorial
+  labels:
+    app: dcache-2
+spec:
+  containers:
+    - name: dcache-2
+      image: dcache/dcache:11.0
+      ports:
+        - name: webdav
+          containerPort: 2880
+          protocol: TCP
+        - name: gsiftp
+          containerPort: 2811
+          protocol: TCP
+      env:
+        - name: DCACHE_DOMAIN_SERVICE_PORTS
+          value: "2880,2811"
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "200m"
+        limits:
+          memory: "1024Mi"
+          cpu: "500m"
+      volumeMounts:
+        - name: hostcert
+          mountPath: /etc/grid-security/hostcert.pem
+          subPath: tls.cert
+        - name: hostcert
+          mountPath: /etc/grid-security/hostkey.pem
+          subPath: tls.key
+        - name: ca-cert
+          mountPath: /etc/grid-security/certificates/5fca1cb1.0
+          subPath: tls.cert
+  volumes:
+    - name: hostcert
+      secret:
+        secretName: hostcert-dcache2
+        defaultMode: 0600
+    - name: ca-cert
+      secret:
+        secretName: ca-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcache-2
+  namespace: rucio-tutorial
+  labels:
+    app: dcache-2
+spec:
+  ports:
+    - port: 2880
+      targetPort: 2880
+      protocol: TCP
+      name: webdav
+    - port: 2811
+      targetPort: 2811
+      protocol: TCP
+      name: gsiftp
+  selector:
+    app: dcache-2
